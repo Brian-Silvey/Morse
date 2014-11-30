@@ -4,11 +4,13 @@
 
 extern "C" int to_morse_code(char symbol);
 extern "C" void init_table(int table[36]);
+extern "C" void init_ledtable(int table[36]);
 
 PwmOut speaker(p21);
 DigitalIn dit(p7);
 DigitalIn dah(p6);
 DigitalIn space(p8);
+BusOut grid(p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p22, p23, p24, p25);
 
 Serial pc(USBTX, USBRX);    // set up serial over USB
 
@@ -25,9 +27,12 @@ int main() {
     dah.mode(PullDown);
     space.mode(PullDown);
     int convert;
+    int loc;
     char input[256];
     int table[36];
     init_table(table);
+    int ledtable[36];
+    init_ledtable(ledtable);
     for (int i = 0; i < 256; i = i + 1) {
         input[i] = NULL;
     }
@@ -126,8 +131,9 @@ input:
         for(int i = 0; input[i] != NULL && i < 256; i = i + 1) {
             if (!isalnum(input[i]))
                 continue;
-            convert = to_morse_code(input[i]);
-            convert = table[convert];
+            loc = to_morse_code(input[i]);
+            convert = table[loc];
+            grid = ledtable[loc];
             while(convert > 1) {
                 if((convert & 1) == 1) {
                     beep(UNIT*3.0);
@@ -138,6 +144,7 @@ input:
                 if (convert > 1)
                     wait(UNIT);
             }
+            grid = 0;
             if (input[i+1] == ' ')
                 wait(UNIT*7.0);
             else
