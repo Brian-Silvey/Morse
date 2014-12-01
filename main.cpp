@@ -50,10 +50,11 @@ input:
         pc.printf("To add a space between words, enter two spaces.\n\r");
         pc.printf("To finish input, enter three spaces.\n\r");
         int loc = 0;
-        char last = ' ';
+        char last = 'd';
         int temp;
         while(1) {
             if (dit) {
+                grid = 0;
                 convert <<= 1;
                 pc.printf(".");
                 last = 'd';
@@ -61,6 +62,7 @@ input:
                 continue;
             }
             if (dah) {
+                grid = 0;
                 convert <<= 1;
                 convert |= 1;
                 pc.printf("-");
@@ -70,6 +72,7 @@ input:
             }
             if (space) {
                 if (last == 'p') {
+                    grid = 0;
                     pc.printf("\n\r");
                     break;
                 }
@@ -91,14 +94,17 @@ input:
                 for (int i = 0; i < 36; i = i + 1) {
                     if (convert == table[i] && i < 26) {
                         input[loc] = (char)(i + 97);
+                        grid = ledtable[i];
                         loc = loc + 1;
                         break;
                     } else if (convert == table[i] && i < 35) {
                         input[loc] = (char)(i + 23);
+                        grid = ledtable[i];
                         loc = loc + 1;
                         break;
                     } else if (convert == table[i]) {
                         input[loc] = '0';
+                        grid = ledtable[i];
                         loc = loc + 1;
                         break;
                     }
@@ -114,7 +120,19 @@ input:
             }
         }
         pc.printf("You entered: %s\n\r", input);
-        wait(0.2);
+        for (int i = 0; input[i] != NULL; i++) {
+            if (input[i] == ' ') {
+                grid = 0;
+                wait(1);
+                continue;
+            }
+            loc = to_morse_code(input[i]);
+            grid = ledtable[loc];
+            wait(1);
+            grid = 0;
+            wait(0.1);
+        }
+        grid = 0;
         while (1) {
             if (space || dit || dah)
                 goto input;
