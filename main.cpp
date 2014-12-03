@@ -1,4 +1,8 @@
 #include "mbed.h"
+#include "DebounceIn.h"
+// must import Cookbook Debounce library into project
+// URL: http://mbed.org/users/AjK/libraries/DebounceIn/lky9pc
+
 #include <string>
 #include <ctype.h>
 
@@ -7,9 +11,9 @@ extern "C" void init_table(int table[36]); // initializes table with morse code 
 extern "C" void init_ledtable(int table[36]); // initializes ledtable with char display values
 
 PwmOut speaker(p21); // piezo buzzer
-DigitalIn dit(p7); // button
-DigitalIn dah(p6); // button
-DigitalIn space(p8); // button
+DebounceIn dit(p7); // button
+DebounceIn dah(p6); // button
+DebounceIn space(p8); // button
 BusOut grid(p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p22, p23, p24, p25); // grid of 16 LEDs
 
 Serial pc(USBTX, USBRX); // set up serial over USB
@@ -20,15 +24,23 @@ float UNIT = 0.15; // change this to set the pace of morse code outputted (faste
 *   beep the speaker for the amount of time specified
 */
 void beep(float time) {
-    speaker = 0.1;
+    speaker = 0.5;
     wait(time);
     speaker = 0.0;
 }
 
 int main() {
-    dit.mode(PullDown);
-    dah.mode(PullDown);
-    space.mode(PullDown);
+    // the following old_[] and new_[] are used to properly debounce buttons dit, dah, and space
+    int old_dit=0;
+    int new_dit;
+    int old_dah=0;
+    int new_dah;
+    int old_space=0;
+    int new_space;
+    // set buttons to internal PullUp instead of using a resistor
+    dit.mode(PullUp);
+    dah.mode(PullUp);
+    space.mode(PullUp);
     int convert; // the converted code/text
     int loc; // general purpose location for arrays
     char input[256]; // user inputted string
@@ -52,24 +64,27 @@ input: // where the real interaction between user and machine begins
         char last = 'd'; // initialize last button pressed to dit/dah (affects space)
         int temp; // used to reverse bit string
         while(1) { // loop until break
-            if (dit) {
+            new_dit = dit;
+            new_dah = dah;
+            new_space = space;
+            if ((new_dit==0) && (old_dit==1)) {
                 grid = 0; // all LEDs OFF
                 convert <<= 1; // add 0 to right of current bit string
                 pc.printf("."); // symbolize dit to user
                 last = 'd'; // set last button pressed to dit/dah
-                wait(0.2); // wait for button debounce
-                continue;
+                //wait(0.2); // wait for button debounce
+                goto continues;
             } // end if
-            if (dah) {
+            if ((new_dah==0) && (old_dah==1)) {
                 grid = 0; // all LEDs OFF
                 convert <<= 1;
                 convert |= 1; // add 1 to right of current bit string
                 pc.printf("-"); // symbolize dah to user
                 last = 'd'; // set last button pressed to dit/dah
-                wait(0.2); // wait for button debounce
-                continue;
+                //wait(0.2); // wait for button debounce
+                goto continues;
             } // end if
-            if (space) {
+            if ((new_space==0) && (old_space==1)) {
                 if (last == 'p') { // if last button pressed was 2nd space in a row
                     grid = 0; // all LEDs OFF
                     pc.printf("\n\r"); // newline
@@ -80,8 +95,8 @@ input: // where the real interaction between user and machine begins
                     input[loc] = ' '; // add space in text string
                     loc = loc + 1; // increment location to next element (NULL)
                     last = 'p'; // set last button pressed to 2nd space in a row
-                    wait(0.2); // wait for button debounce
-                    continue;
+                    //wait(0.2); // wait for button debounce
+                    goto continues;
                 } // end if
                 temp = 1; // initialize temporary bit string to 1
                 while (convert > 1) { // reverse bit string excluding leftmost 1
@@ -114,9 +129,13 @@ input: // where the real interaction between user and machine begins
                     break; // break while loop
                 if (last == 'd') // if last button pressed is dit/dah
                     last = 's'; // set last button pressed to 1st space
-                wait(0.2); // wait for button debounce
-                continue;
+                //wait(0.2); // wait for button debounce
+                goto continues;
             } // end if
+continues:
+            old_dit = new_dit;
+            old_dah = new_dah;
+            old_space = new_space;
         } // end while
         pc.printf("You entered: %s\n\r", input); // display converted morse to text
         for (int i = 0; input[i] != NULL; i++) { // display each char in LEDs for 1 second
@@ -132,10 +151,7 @@ input: // where the real interaction between user and machine begins
             wait(0.1); // wait 0.1 seconds for brief blink effect
         } // end for
         grid = 0; // all LEDs OFF
-        while (1) { // wait until another input to start over
-            if (space || dit || dah) // if any button is pressed on the board
-                goto input; // rerun
-        } // end while
+        goto input; // rerun
     } else if (input[0] == '2') { // if (Text to Morse code)
         pc.printf("Text to Morse code\n\r");
         pc.printf("Input word or phrase to convert to Morse Code:\n\r");
@@ -167,10 +183,7 @@ input: // where the real interaction between user and machine begins
             else // if next element is letter
                 wait(UNIT*3.0); // wait for 3 units
         } // end for
-        while (1) { // wait until another input to start over
-            if (space || dit || dah) // if any button is pressed on the board
-                goto input; // rerun
-        } // end while
+        goto input; // rerun
     } else { // if neither modes are inputted
         pc.printf("Neither! Please input either '1' or '2'!\n\r");
         goto input; // rerun
